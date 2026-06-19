@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Winapp Management logo">
+  <defs>
+    <filter id="markShadow" x="40" y="40" width="940" height="900" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#0f172a" flood-opacity=".20"/>
+    </filter>
+  </defs>
+  <g filter="url(#markShadow)">
+    <rect x="96" y="112" width="694" height="632" rx="105" fill="#ffffff" stroke="#93c5fd" stroke-width="14"/>
+    <path d="M201 112h484a105 105 0 0 1 105 105v57H96v-57a105 105 0 0 1 105-105Z" fill="#2563eb"/>
+    <rect x="96" y="200" width="694" height="74" fill="#2563eb"/>
+    <circle cx="184" cy="193" r="21" fill="#dbeafe"/>
+    <circle cx="250" cy="193" r="21" fill="#dbeafe"/>
+    <circle cx="316" cy="193" r="21" fill="#dbeafe"/>
+    <rect x="154" y="396" width="48" height="48" rx="16" fill="none" stroke="#64748b" stroke-width="9"/>
+    <rect x="154" y="508" width="48" height="48" rx="16" fill="none" stroke="#64748b" stroke-width="9"/>
+    <rect x="154" y="620" width="48" height="48" rx="16" fill="none" stroke="#64748b" stroke-width="9"/>
+    <rect x="248" y="406" width="344" height="42" rx="21" fill="#64748b"/>
+    <rect x="248" y="518" width="420" height="42" rx="21" fill="#64748b"/>
+    <rect x="248" y="630" width="300" height="42" rx="21" fill="#64748b"/>
+    <path d="M780 138l45 100 109 9-82 75 25 108-97-57-97 57 25-108-82-75 109-9 45-100Z" fill="#f59e0b" stroke="#d97706" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M646 760l94 86 170-216" fill="none" stroke="#16a34a" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
