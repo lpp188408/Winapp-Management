@@ -585,7 +585,15 @@
                   <DataTemplate>
                     <Button Command="{Binding DataContext.ActivateItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding}"
+                            Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                             Style="{StaticResource LinkButtonStyle}">
+                      <Button.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="打开文件所在目录"
+                                    Command="{Binding PlacementTarget.Tag.OpenContainingFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                    CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        </ContextMenu>
+                      </Button.ContextMenu>
                       <TextBlock Text="{Binding DisplayPath}" HorizontalAlignment="Left" FontWeight="Normal" TextDecorations="Underline" TextTrimming="CharacterEllipsis" />
                     </Button>
                   </DataTemplate>
@@ -633,12 +641,29 @@
                                  Style="{StaticResource CellTextStyle}"
                                  FontWeight="Normal"
                                  Foreground="#2563EB"
-                                 TextDecorations="Underline" />
+                                 TextDecorations="Underline"
+                                 Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <TextBlock.ContextMenu>
+                          <ContextMenu>
+                            <MenuItem Header="打开文件所在目录"
+                                      Command="{Binding PlacementTarget.Tag.OpenContainingFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                          </ContextMenu>
+                        </TextBlock.ContextMenu>
+                      </TextBlock>
                       <Button Command="{Binding DataContext.ResolveOfficeDirectoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                               CommandParameter="{Binding}"
                               Visibility="{Binding UnknownOfficeDirectoryVisibility}"
+                              Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                               Style="{StaticResource LinkButtonStyle}"
                               ToolTip="点击后手工选择这个 Office 窗口对应的文件">
+                        <Button.ContextMenu>
+                          <ContextMenu>
+                            <MenuItem Header="打开文件所在目录"
+                                      Command="{Binding PlacementTarget.Tag.OpenContainingFolderCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                          </ContextMenu>
+                        </Button.ContextMenu>
                         <TextBlock Text="未识别目录，点击手工选择"
                                    FontWeight="Normal"
                                    Foreground="#94A3B8"

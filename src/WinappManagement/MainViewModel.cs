@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.IO;
@@ -40,6 +41,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         CloseSelectedCommand = new RelayCommand(_ => CloseSelected(), _ => Items.Any(item => item.IsSelected));
         CloseItemCommand = new RelayCommand(parameter => CloseItem(parameter as ActivityItem), parameter => parameter is ActivityItem);
         ActivateItemCommand = new RelayCommand(parameter => ActivateItem(parameter as ActivityItem), parameter => parameter is ActivityItem);
+        OpenContainingFolderCommand = new RelayCommand(parameter => OpenContainingFolder(parameter as ActivityItem), parameter => CanOpenContainingFolder(parameter as ActivityItem));
         ToggleSelectionCommand = new RelayCommand(parameter => ToggleSelection(parameter as ActivityItem), parameter => parameter is ActivityItem);
         ToggleFavoriteCommand = new RelayCommand(parameter => ToggleFavorite(parameter as ActivityItem), parameter => parameter is ActivityItem);
         ResolveOfficeDirectoryCommand = new RelayCommand(parameter => ResolveOfficeDirectory(parameter as ActivityItem), parameter => parameter is ActivityItem item && item.IsOfficeFile);
@@ -97,6 +99,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand CloseItemCommand { get; }
 
     public RelayCommand ActivateItemCommand { get; }
+
+    public RelayCommand OpenContainingFolderCommand { get; }
 
     public RelayCommand ToggleSelectionCommand { get; }
 
@@ -499,6 +503,86 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             : "切换失败";
     }
 
+    private static bool CanOpenContainingFolder(ActivityItem? item)
+    {
+        return item is not null && !string.IsNullOrWhiteSpace(ContainingFolderTarget(item));
+    }
+
+    private void OpenContainingFolder(ActivityItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var target = ContainingFolderTarget(item);
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            MessageBox.Show("当前项目没有可打开的文件目录。", "打开所在目录", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            if (File.Exists(target))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{target}\"",
+                    UseShellExecute = true
+                });
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{target}\"",
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            MessageBox.Show("打开目录失败。这个路径可能已经不存在。", "打开所在目录", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static string ContainingFolderTarget(ActivityItem item)
+    {
+        var preferredPath = !string.IsNullOrWhiteSpace(item.OpenPath)
+            ? item.OpenPath
+            : item.Path;
+
+        if (File.Exists(preferredPath) || Directory.Exists(preferredPath))
+        {
+            return preferredPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.DirectoryPath) && Directory.Exists(item.DirectoryPath))
+        {
+            return item.DirectoryPath;
+        }
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(preferredPath) && Path.IsPathRooted(preferredPath))
+            {
+                var directory = Path.GetDirectoryName(preferredPath);
+                if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                {
+                    return directory;
+                }
+            }
+        }
+        catch
+        {
+            return string.Empty;
+        }
+
+        return string.Empty;
+    }
+
     private void ToggleSelection(ActivityItem? item)
     {
         if (item is null)
@@ -729,6 +813,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
 
-        return string.IsNullOrWhiteSpace(version) ? "1.0.4" : version;
+        return string.IsNullOrWhiteSpace(version) ? "1.0.5" : version;
     }
 }
