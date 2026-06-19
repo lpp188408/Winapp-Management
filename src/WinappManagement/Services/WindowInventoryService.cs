@@ -124,7 +124,7 @@ public sealed class WindowInventoryService
     {
         if (item.WindowHandle == 0)
         {
-            return new CloseRequestResult(false, item.ProcessId, item.WindowHandle, []);
+            return new CloseRequestResult(false, item.ProcessId, item.WindowHandle, new HashSet<nint>());
         }
 
         var knownWindows = GetVisibleWindowsForProcess(item.ProcessId);
