@@ -1,5 +1,8 @@
 using System.IO;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.Json;
 
 namespace WinappManagement.Services;
 
@@ -11,6 +14,7 @@ public sealed class OfficeDocumentService
         TryAddDocuments(documents, "Word.Application", "WINWORD", "Documents");
         TryAddDocuments(documents, "Excel.Application", "EXCEL", "Workbooks");
         TryAddExcelWindowDocuments(documents);
+        TryAddExcelDocumentsFromPowerShell(documents);
         TryAddDocuments(documents, "PowerPoint.Application", "POWERPNT", "Presentations");
         TryAddProtectedViewDocuments(documents, "Word.Application", "WINWORD", "Document");
         TryAddProtectedViewDocuments(documents, "Excel.Application", "EXCEL", "Workbook");
@@ -214,6 +218,137 @@ public sealed class OfficeDocumentService
             ReleaseComObject(collection);
             ReleaseComObject(app);
         }
+    }
+
+    private static void TryAddExcelDocumentsFromPowerShell(List<OfficeDocumentInfo> documents)
+    {
+        try
+        {
+            var script = """
+                [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+                $items = @()
+                try {
+                    $excel = [Runtime.InteropServices.Marshal]::GetActiveObject('Excel.Application')
+                    for ($i = 1; $i -le $excel.Windows.Count; $i++) {
+                        try {
+                            $window = $excel.Windows.Item($i)
+                            $workbook = $window.ActiveSheet.Parent
+                            if ($workbook.FullName -and [System.IO.Path]::IsPathRooted([string]$workbook.FullName)) {
+                                $items += [PSCustomObject]@{
+                                    Name = [string]$workbook.Name
+                                    FullName = [string]$workbook.FullName
+                                    DirectoryPath = [string]$workbook.Path
+                                    WindowCaption = [string]$window.Caption
+                                    WindowHandle = [string]$window.Hwnd
+                                }
+                            }
+                        } catch {}
+                    }
+                } catch {}
+                $items | ConvertTo-Json -Compress -Depth 3
+                """;
+
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command {QuotePowerShellArgument(script)}",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
+
+            process.Start();
+            if (!process.WaitForExit(3000))
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch
+                {
+                    // Ignore cleanup failures.
+                }
+
+                return;
+            }
+
+            var output = process.StandardOutput.ReadToEnd();
+            _ = process.StandardError.ReadToEnd();
+            if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
+            {
+                return;
+            }
+
+            AddExcelDocumentsFromJson(documents, output);
+        }
+        catch
+        {
+            // This is a fallback for machines where direct Excel COM reflection fails.
+        }
+    }
+
+    private static string QuotePowerShellArgument(string script)
+    {
+        return "\"" + script.Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " ") + "\"";
+    }
+
+    private static void AddExcelDocumentsFromJson(List<OfficeDocumentInfo> documents, string json)
+    {
+        using var payload = JsonDocument.Parse(json);
+        if (payload.RootElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in payload.RootElement.EnumerateArray())
+            {
+                AddExcelDocumentFromJson(documents, element);
+            }
+            return;
+        }
+
+        if (payload.RootElement.ValueKind == JsonValueKind.Object)
+        {
+            AddExcelDocumentFromJson(documents, payload.RootElement);
+        }
+    }
+
+    private static void AddExcelDocumentFromJson(List<OfficeDocumentInfo> documents, JsonElement element)
+    {
+        var fullName = JsonString(element, "FullName");
+        if (string.IsNullOrWhiteSpace(fullName) || !Path.IsPathRooted(fullName))
+        {
+            return;
+        }
+
+        var directoryPath = JsonString(element, "DirectoryPath");
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            directoryPath = Path.GetDirectoryName(fullName) ?? string.Empty;
+        }
+
+        var name = JsonString(element, "Name");
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = Path.GetFileName(fullName);
+        }
+
+        AddDocument(
+            documents,
+            "EXCEL",
+            name,
+            fullName,
+            directoryPath,
+            JsonString(element, "WindowCaption"),
+            ToIntPtr(JsonString(element, "WindowHandle")));
+    }
+
+    private static string JsonString(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property) && property.ValueKind != JsonValueKind.Null
+            ? property.ToString()
+            : string.Empty;
     }
 
     private static void AddDocument(List<OfficeDocumentInfo> documents, string processName, string name, string fullName, string directoryPath, string windowCaption = "", nint windowHandle = 0)

@@ -6,6 +6,16 @@
 - 次版本：新增功能时更新。
 - 修订版本：修复问题、小优化时更新。
 
+## v1.0.4 - 2026-06-19
+
+Excel 目录读取兜底修复版本。
+
+- 根据用户诊断日志确认 PowerShell COM 能稳定读取 Excel `FullName / Path`。
+- 主程序在 Office 缓存刷新时增加 PowerShell COM 兜底读取通道，用同样方式读取 Excel `Application.Windows`。
+- PowerShell 结果会和 C# COM 结果合并，用 `FullName` 去重并补齐 `WindowCaption / WindowHandle`。
+- 兜底读取限制为 3 秒超时，避免 Excel 忙碌时拖住刷新流程。
+- 应用程序页“路径”列改为普通字重，不再加粗。
+
 ## v1.0.3 - 2026-06-19
 
 Excel 目录自动识别专项修复版本。

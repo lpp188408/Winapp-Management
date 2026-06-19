@@ -586,7 +586,7 @@
                     <Button Command="{Binding DataContext.ActivateItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                             CommandParameter="{Binding}"
                             Style="{StaticResource LinkButtonStyle}">
-                      <TextBlock Text="{Binding DisplayPath}" HorizontalAlignment="Left" TextDecorations="Underline" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding DisplayPath}" HorizontalAlignment="Left" FontWeight="Normal" TextDecorations="Underline" TextTrimming="CharacterEllipsis" />
                     </Button>
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
