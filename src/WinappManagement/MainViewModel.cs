@@ -729,6 +729,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
 
-        return string.IsNullOrWhiteSpace(version) ? "1.0.2" : version;
+        return string.IsNullOrWhiteSpace(version) ? "1.0.3" : version;
     }
 }

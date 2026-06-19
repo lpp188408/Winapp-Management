@@ -26,6 +26,7 @@ public sealed class WindowInventoryService
         var items = new List<ActivityItem>();
         var folderHandles = new HashSet<nint>();
         var officeDocuments = GetOfficeDocuments();
+        var directOfficeFullNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var folder in GetExplorerFolders())
         {
@@ -35,6 +36,16 @@ public sealed class WindowInventoryService
             }
 
             items.Add(folder);
+        }
+
+        foreach (var officeItem in CreateDirectOfficeItems(officeDocuments))
+        {
+            if (!string.IsNullOrWhiteSpace(officeItem.Path))
+            {
+                directOfficeFullNames.Add(officeItem.Path);
+            }
+
+            items.Add(officeItem);
         }
 
         NativeMethods.EnumWindows((hWnd, _) =>
@@ -67,6 +78,12 @@ public sealed class WindowInventoryService
             if (kind == AppActivityKind.OfficeFile)
             {
                 var officeDocument = MatchOfficeDocument(officeDocuments, processName, displayName, title, hWnd);
+                if (processName.Equals("EXCEL", StringComparison.OrdinalIgnoreCase)
+                    && directOfficeFullNames.Count > 0)
+                {
+                    return true;
+                }
+
                 if (officeDocument is not null)
                 {
                     path = officeDocument.FullName;
@@ -97,6 +114,43 @@ public sealed class WindowInventoryService
         }, 0);
 
         return new ReadOnlyCollection<ActivityItem>(items);
+    }
+
+    private IEnumerable<ActivityItem> CreateDirectOfficeItems(IReadOnlyList<OfficeDocumentInfo> officeDocuments)
+    {
+        foreach (var document in officeDocuments.Where(document =>
+            document.ProcessName.Equals("EXCEL", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(document.FullName)
+            && Path.IsPathRooted(document.FullName)))
+        {
+            var hWnd = document.WindowHandle;
+            var pid = 0;
+            if (hWnd != 0)
+            {
+                NativeMethods.GetWindowThreadProcessId(hWnd, out var pidValue);
+                pid = unchecked((int)pidValue);
+            }
+
+            var title = string.IsNullOrWhiteSpace(document.WindowCaption)
+                ? document.FileName
+                : document.WindowCaption;
+
+            yield return new ActivityItem
+            {
+                Id = $"office-com:{document.ProcessName}:{hWnd}:{document.FullName}",
+                Kind = AppActivityKind.OfficeFile,
+                WindowHandle = hWnd,
+                ProcessId = pid,
+                ProcessName = document.ProcessName,
+                DisplayName = document.FileName,
+                WindowTitle = title,
+                Path = document.FullName,
+                DirectoryPath = document.DirectoryPath,
+                OpenPath = document.FullName,
+                CanFavorite = true,
+                Icon = _iconService.GetIcon(AppActivityKind.OfficeFile, document.FullName, document.FileName)
+            };
+        }
     }
 
     private IReadOnlyList<OfficeDocumentInfo> GetOfficeDocuments()

@@ -6,6 +6,15 @@
 - 次版本：新增功能时更新。
 - 修订版本：修复问题、小优化时更新。
 
+## v1.0.3 - 2026-06-19
+
+Excel 目录自动识别专项修复版本。
+
+- 根据诊断日志确认 Excel COM 已暴露 `Workbooks` 和 `Windows` 的真实 `FullName / Path`。
+- Excel 文件行改为优先从 Excel COM `Application.Windows` 直接生成，天然携带 `Caption / FullName / Path`。
+- 普通窗口枚举中的 Excel 行在已有 COM 直接结果时不再重复显示，避免出现一条有目录、一条仍显示 `未识别目录`。
+- 保留 `v1.0.2` 的“未识别目录，点击手工选择”兜底功能。
+
 ## v1.0.2 - 2026-06-19
 
 Office 目录兜底和 Excel 自动识别增强版本。
