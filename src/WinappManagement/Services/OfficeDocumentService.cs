@@ -222,9 +222,11 @@ public sealed class OfficeDocumentService
 
     private static void TryAddExcelDocumentsFromPowerShell(List<OfficeDocumentInfo> documents)
     {
+        string? scriptPath = null;
         try
         {
             var script = """
+                $ErrorActionPreference = 'Continue'
                 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
                 $items = @()
                 try {
@@ -244,15 +246,20 @@ public sealed class OfficeDocumentService
                             }
                         } catch {}
                     }
-                } catch {}
+                } catch {
+                    [Console]::Error.WriteLine($_.Exception.Message)
+                }
                 $items | ConvertTo-Json -Compress -Depth 3
                 """;
+
+            scriptPath = Path.Combine(Path.GetTempPath(), $"winapp-excel-diagnostic-{Guid.NewGuid():N}.ps1");
+            File.WriteAllText(scriptPath, script, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
 
             using var process = new Process();
             process.StartInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command {QuotePowerShellArgument(script)}",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\"",
                 CreateNoWindow = true,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -277,7 +284,8 @@ public sealed class OfficeDocumentService
             }
 
             var output = process.StandardOutput.ReadToEnd();
-            _ = process.StandardError.ReadToEnd();
+            var error = process.StandardError.ReadToEnd();
+            WriteExcelFallbackLog(process.ExitCode, output, error);
             if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
             {
                 return;
@@ -289,11 +297,47 @@ public sealed class OfficeDocumentService
         {
             // This is a fallback for machines where direct Excel COM reflection fails.
         }
+        finally
+        {
+            TryDeleteFile(scriptPath);
+        }
     }
 
-    private static string QuotePowerShellArgument(string script)
+    private static void WriteExcelFallbackLog(int exitCode, string output, string error)
     {
-        return "\"" + script.Replace("\"", "\\\"").Replace("\r", " ").Replace("\n", " ") + "\"";
+        try
+        {
+            var logPath = Path.Combine(Path.GetTempPath(), "winapp-management-excel-fallback.log");
+            var text = new StringBuilder()
+                .AppendLine($"Time: {DateTime.Now:O}")
+                .AppendLine($"ExitCode: {exitCode}")
+                .AppendLine("STDOUT:")
+                .AppendLine(output)
+                .AppendLine("STDERR:")
+                .AppendLine(error)
+                .AppendLine(new string('-', 80))
+                .ToString();
+            File.AppendAllText(logPath, text, Encoding.UTF8);
+        }
+        catch
+        {
+            // Logging must never affect the app.
+        }
+    }
+
+    private static void TryDeleteFile(string? filePath)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+        catch
+        {
+            // Temporary file cleanup is best-effort.
+        }
     }
 
     private static void AddExcelDocumentsFromJson(List<OfficeDocumentInfo> documents, string json)

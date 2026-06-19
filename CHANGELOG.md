@@ -6,6 +6,14 @@
 - 次版本：新增功能时更新。
 - 修订版本：修复问题、小优化时更新。
 
+## v1.0.6 - 2026-06-19
+
+Excel 目录兜底执行方式修复版本。
+
+- 主程序内置 Excel PowerShell 兜底读取不再使用 `-Command` 拼接长脚本。
+- 改为临时写入 `.ps1` 文件后通过 `powershell.exe -File` 执行，和用户已验证成功的诊断脚本执行方式一致。
+- 增加主程序内部诊断日志：`%TEMP%\winapp-management-excel-fallback.log`，记录 PowerShell 兜底读取的输出和错误。
+
 ## v1.0.5 - 2026-06-19
 
 右键打开所在目录版本。
