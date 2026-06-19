@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using System.IO;
@@ -526,7 +525,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (File.Exists(target))
             {
-                Process.Start(new ProcessStartInfo
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "explorer.exe",
                     Arguments = $"/select,\"{target}\"",
@@ -535,7 +534,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 return;
             }
 
-            Process.Start(new ProcessStartInfo
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "explorer.exe",
                 Arguments = $"\"{target}\"",
