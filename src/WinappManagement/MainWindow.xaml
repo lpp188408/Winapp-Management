@@ -627,21 +627,25 @@
               <DataGridTemplateColumn Header="文件目录" Width="*" MinWidth="300">
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate>
-                    <TextBlock Text="{Binding OfficeDirectoryDisplay}">
-                      <TextBlock.Style>
-                        <Style TargetType="TextBlock" BasedOn="{StaticResource CellTextStyle}">
-                          <Setter Property="FontWeight" Value="Normal" />
-                          <Setter Property="Foreground" Value="#2563EB" />
-                          <Setter Property="TextDecorations" Value="Underline" />
-                          <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsUnknownOfficeDirectory}" Value="True">
-                              <Setter Property="Foreground" Value="#94A3B8" />
-                              <Setter Property="TextDecorations" Value="{x:Null}" />
-                            </DataTrigger>
-                          </Style.Triggers>
-                        </Style>
-                      </TextBlock.Style>
-                    </TextBlock>
+                    <Grid>
+                      <TextBlock Text="{Binding OfficeDirectoryDisplay}"
+                                 Visibility="{Binding KnownOfficeDirectoryVisibility}"
+                                 Style="{StaticResource CellTextStyle}"
+                                 FontWeight="Normal"
+                                 Foreground="#2563EB"
+                                 TextDecorations="Underline" />
+                      <Button Command="{Binding DataContext.ResolveOfficeDirectoryCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                              CommandParameter="{Binding}"
+                              Visibility="{Binding UnknownOfficeDirectoryVisibility}"
+                              Style="{StaticResource LinkButtonStyle}"
+                              ToolTip="点击后手工选择这个 Office 窗口对应的文件">
+                        <TextBlock Text="未识别目录，点击手工选择"
+                                   FontWeight="Normal"
+                                   Foreground="#94A3B8"
+                                   TextDecorations="Underline"
+                                   TextTrimming="CharacterEllipsis" />
+                      </Button>
+                    </Grid>
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>

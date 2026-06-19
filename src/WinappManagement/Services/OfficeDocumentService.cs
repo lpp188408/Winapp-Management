@@ -10,6 +10,7 @@ public sealed class OfficeDocumentService
         var documents = new List<OfficeDocumentInfo>();
         TryAddDocuments(documents, "Word.Application", "WINWORD", "Documents");
         TryAddDocuments(documents, "Excel.Application", "EXCEL", "Workbooks");
+        TryAddExcelWindowDocuments(documents);
         TryAddDocuments(documents, "PowerPoint.Application", "POWERPNT", "Presentations");
         TryAddProtectedViewDocuments(documents, "Word.Application", "WINWORD", "Document");
         TryAddProtectedViewDocuments(documents, "Excel.Application", "EXCEL", "Workbook");
@@ -144,16 +145,99 @@ public sealed class OfficeDocumentService
         }
     }
 
-    private static void AddDocument(List<OfficeDocumentInfo> documents, string processName, string name, string fullName, string directoryPath)
+    private static void TryAddExcelWindowDocuments(List<OfficeDocumentInfo> documents)
     {
-        if (documents.Any(document =>
-            document.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase)
-            && document.FullName.Equals(fullName, StringComparison.OrdinalIgnoreCase)))
+        object? app = null;
+        object? collection = null;
+        try
         {
+            app = GetActiveObject("Excel.Application");
+            if (app is null)
+            {
+                return;
+            }
+
+            collection = GetProperty(app, "Windows");
+            var count = ToInt(GetProperty(collection, "Count"));
+            for (var index = 1; index <= count; index++)
+            {
+                object? window = null;
+                object? sheet = null;
+                object? workbook = null;
+                try
+                {
+                    window = Invoke(collection, "Item", index);
+                    var caption = ToString(GetProperty(window, "Caption"));
+                    var hwnd = ToIntPtr(GetProperty(window, "Hwnd"));
+
+                    sheet = GetProperty(window, "ActiveSheet");
+                    workbook = GetProperty(sheet, "Parent");
+                    var name = ToString(GetProperty(workbook, "Name"));
+                    var fullName = ToString(GetProperty(workbook, "FullName"));
+                    var directoryPath = ToString(GetProperty(workbook, "Path"));
+
+                    if (string.IsNullOrWhiteSpace(fullName) || !Path.IsPathRooted(fullName))
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(directoryPath))
+                    {
+                        directoryPath = Path.GetDirectoryName(fullName) ?? string.Empty;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        name = Path.GetFileName(fullName);
+                    }
+
+                    AddDocument(documents, "EXCEL", name, fullName, directoryPath, caption, hwnd);
+                }
+                catch
+                {
+                    // Excel can expose chart windows, protected views, or add-in windows that do not map cleanly to a workbook.
+                }
+                finally
+                {
+                    ReleaseComObject(workbook);
+                    ReleaseComObject(sheet);
+                    ReleaseComObject(window);
+                }
+            }
+        }
+        catch
+        {
+            // Excel may be absent, elevated, busy, or not exposing the Windows collection.
+        }
+        finally
+        {
+            ReleaseComObject(collection);
+            ReleaseComObject(app);
+        }
+    }
+
+    private static void AddDocument(List<OfficeDocumentInfo> documents, string processName, string name, string fullName, string directoryPath, string windowCaption = "", nint windowHandle = 0)
+    {
+        var existingIndex = documents.FindIndex(document =>
+            document.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase)
+            && document.FullName.Equals(fullName, StringComparison.OrdinalIgnoreCase));
+        if (existingIndex >= 0)
+        {
+            var existing = documents[existingIndex];
+            if ((existing.WindowHandle == 0 && windowHandle != 0)
+                || (string.IsNullOrWhiteSpace(existing.WindowCaption) && !string.IsNullOrWhiteSpace(windowCaption)))
+            {
+                documents[existingIndex] = existing with
+                {
+                    WindowCaption = string.IsNullOrWhiteSpace(existing.WindowCaption) ? windowCaption : existing.WindowCaption,
+                    WindowHandle = existing.WindowHandle == 0 ? windowHandle : existing.WindowHandle
+                };
+            }
+
             return;
         }
 
-        documents.Add(new OfficeDocumentInfo(processName, name, fullName, directoryPath));
+        documents.Add(new OfficeDocumentInfo(processName, name, fullName, directoryPath, windowCaption, windowHandle));
     }
 
     private static object? GetActiveObject(string progId)
@@ -203,6 +287,18 @@ public sealed class OfficeDocumentService
     private static string ToString(object? value)
     {
         return value?.ToString() ?? string.Empty;
+    }
+
+    private static nint ToIntPtr(object? value)
+    {
+        try
+        {
+            return (nint)Convert.ToInt64(value);
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     private static void ReleaseComObject(object? value)

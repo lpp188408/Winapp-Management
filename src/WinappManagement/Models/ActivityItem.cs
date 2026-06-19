@@ -20,10 +20,10 @@ public sealed class ActivityItem : INotifyPropertyChanged
     public required string ProcessName { get; init; }
     public required string DisplayName { get; init; }
     public required string WindowTitle { get; init; }
-    public required string Path { get; init; }
-    public string DirectoryPath { get; init; } = string.Empty;
-    public required string OpenPath { get; init; }
-    public required bool CanFavorite { get; init; }
+    public required string Path { get; set; }
+    public string DirectoryPath { get; set; } = string.Empty;
+    public required string OpenPath { get; set; }
+    public required bool CanFavorite { get; set; }
     public ImageSource? Icon { get; set; }
 
     public string Status
@@ -104,6 +104,14 @@ public sealed class ActivityItem : INotifyPropertyChanged
 
     public bool IsUnknownOfficeDirectory => string.IsNullOrWhiteSpace(OfficeDirectory);
 
+    public Visibility UnknownOfficeDirectoryVisibility => IsUnknownOfficeDirectory
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public Visibility KnownOfficeDirectoryVisibility => IsUnknownOfficeDirectory
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
     public string KindLabel => Kind switch
     {
         ActivityKind.Folder => "文件夹",
@@ -160,6 +168,34 @@ public sealed class ActivityItem : INotifyPropertyChanged
     private void OnPropertyChanged(string propertyName)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public void ApplyManualOfficePath(string fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+        {
+            return;
+        }
+
+        Path = fullPath;
+        DirectoryPath = TryGetDirectory(fullPath);
+        OpenPath = fullPath;
+        CanFavorite = true;
+
+        OnPropertyChanged(nameof(Path));
+        OnPropertyChanged(nameof(DirectoryPath));
+        OnPropertyChanged(nameof(OpenPath));
+        OnPropertyChanged(nameof(CanFavorite));
+        OnPropertyChanged(nameof(FavoriteKey));
+        OnPropertyChanged(nameof(DisplayPath));
+        OnPropertyChanged(nameof(OfficeDirectory));
+        OnPropertyChanged(nameof(OfficeDirectoryDisplay));
+        OnPropertyChanged(nameof(IsUnknownOfficeDirectory));
+        OnPropertyChanged(nameof(UnknownOfficeDirectoryVisibility));
+        OnPropertyChanged(nameof(KnownOfficeDirectoryVisibility));
+        OnPropertyChanged(nameof(KindLabel));
+        OnPropertyChanged(nameof(OfficeTypeLabel));
+        OnPropertyChanged(nameof(OfficeTypeOrder));
     }
 
     private static string TryGetDirectory(string path)

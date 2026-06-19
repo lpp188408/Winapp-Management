@@ -66,7 +66,7 @@ public sealed class WindowInventoryService
             var (kind, displayName, path, directoryPath, openPath) = WindowTitleClassifier.Classify(title, processName, executablePath);
             if (kind == AppActivityKind.OfficeFile)
             {
-                var officeDocument = MatchOfficeDocument(officeDocuments, processName, displayName, title);
+                var officeDocument = MatchOfficeDocument(officeDocuments, processName, displayName, title, hWnd);
                 if (officeDocument is not null)
                 {
                     path = officeDocument.FullName;
@@ -235,7 +235,8 @@ public sealed class WindowInventoryService
         IReadOnlyList<OfficeDocumentInfo> documents,
         string processName,
         string displayName,
-        string title)
+        string title,
+        nint windowHandle)
     {
         var candidates = documents
             .Where(document => document.ProcessName.Equals(processName, StringComparison.OrdinalIgnoreCase))
@@ -244,6 +245,12 @@ public sealed class WindowInventoryService
         if (candidates.Count == 0)
         {
             return null;
+        }
+
+        var handleMatch = candidates.FirstOrDefault(document => document.WindowHandle != 0 && document.WindowHandle == windowHandle);
+        if (handleMatch is not null)
+        {
+            return handleMatch;
         }
 
         if (processName.Equals("EXCEL", StringComparison.OrdinalIgnoreCase) && candidates.Count == 1)
@@ -265,11 +272,14 @@ public sealed class WindowInventoryService
             || OfficeNameEquals(FileNameWithoutExtension(document.FileName), normalizedDisplayName)
             || OfficeNameEquals(document.Name, normalizedTitle)
             || OfficeNameEquals(document.FileName, normalizedTitle)
+            || OfficeNameEquals(document.WindowCaption, normalizedTitle)
             || normalizedTitleParts.Any(part =>
                 OfficeNameEquals(document.Name, part)
                 || OfficeNameEquals(document.FileName, part)
                 || OfficeNameEquals(FileNameWithoutExtension(document.Name), part)
-                || OfficeNameEquals(FileNameWithoutExtension(document.FileName), part)));
+                || OfficeNameEquals(FileNameWithoutExtension(document.FileName), part)
+                || OfficeNameEquals(document.WindowCaption, part)
+                || OfficeNameEquals(FileNameWithoutExtension(document.WindowCaption), part)));
         if (exactMatch is not null)
         {
             return exactMatch;
@@ -277,7 +287,8 @@ public sealed class WindowInventoryService
 
         var titleMatch = candidates.FirstOrDefault(document =>
             ContainsOfficeName(title, document.Name)
-            || ContainsOfficeName(title, document.FileName));
+            || ContainsOfficeName(title, document.FileName)
+            || ContainsOfficeName(title, document.WindowCaption));
         if (titleMatch is not null)
         {
             return titleMatch;

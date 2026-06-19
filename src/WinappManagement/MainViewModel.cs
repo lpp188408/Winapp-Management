@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
 using System.Threading;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using WinappManagement.Models;
 using WinappManagement.Services;
 
@@ -40,6 +42,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ActivateItemCommand = new RelayCommand(parameter => ActivateItem(parameter as ActivityItem), parameter => parameter is ActivityItem);
         ToggleSelectionCommand = new RelayCommand(parameter => ToggleSelection(parameter as ActivityItem), parameter => parameter is ActivityItem);
         ToggleFavoriteCommand = new RelayCommand(parameter => ToggleFavorite(parameter as ActivityItem), parameter => parameter is ActivityItem);
+        ResolveOfficeDirectoryCommand = new RelayCommand(parameter => ResolveOfficeDirectory(parameter as ActivityItem), parameter => parameter is ActivityItem item && item.IsOfficeFile);
         OpenFavoriteCommand = new RelayCommand(parameter => OpenFavorite(parameter as FavoriteItem), parameter => parameter is FavoriteItem);
         RemoveFavoriteCommand = new RelayCommand(parameter => RemoveFavorite(parameter as FavoriteItem), parameter => parameter is FavoriteItem);
 
@@ -98,6 +101,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public RelayCommand ToggleSelectionCommand { get; }
 
     public RelayCommand ToggleFavoriteCommand { get; }
+
+    public RelayCommand ResolveOfficeDirectoryCommand { get; }
 
     public RelayCommand OpenFavoriteCommand { get; }
 
@@ -303,6 +308,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         foreach (var snapshotItem in snapshot)
         {
+            if (existingItems.TryGetValue(snapshotItem.Id, out var previousItem))
+            {
+                PreserveManualOfficePath(previousItem, snapshotItem);
+            }
+
             if (existingItems.TryGetValue(snapshotItem.Id, out var existingItem) && CanReuseItem(existingItem, snapshotItem))
             {
                 existingItem.IsFavorite = existingItem.CanFavorite && favoriteIds.Contains(existingItem.FavoriteKey);
@@ -323,6 +333,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
 
         return syncedItems;
+    }
+
+    private static void PreserveManualOfficePath(ActivityItem existingItem, ActivityItem snapshotItem)
+    {
+        if (!existingItem.IsOfficeFile
+            || !snapshotItem.IsOfficeFile
+            || !snapshotItem.IsUnknownOfficeDirectory
+            || existingItem.IsUnknownOfficeDirectory
+            || string.IsNullOrWhiteSpace(existingItem.OpenPath))
+        {
+            return;
+        }
+
+        snapshotItem.ApplyManualOfficePath(existingItem.OpenPath);
     }
 
     private static bool CanReuseItem(ActivityItem existingItem, ActivityItem snapshotItem)
@@ -522,6 +546,71 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         RefreshFavoriteViews();
     }
 
+    private void ResolveOfficeDirectory(ActivityItem? item)
+    {
+        if (item is null || !item.IsOfficeFile)
+        {
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择这个 Office 窗口对应的文件",
+            CheckFileExists = true,
+            Multiselect = false,
+            Filter = OfficeFileDialogFilter(item),
+            InitialDirectory = InitialOfficeDirectory()
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var fullPath = dialog.FileName;
+        if (string.IsNullOrWhiteSpace(fullPath) || !File.Exists(fullPath))
+        {
+            return;
+        }
+
+        item.ApplyManualOfficePath(fullPath);
+        item.Icon = _iconService.GetIcon(item.Kind, item.OpenPath, item.DisplayName);
+        item.IsFavorite = Favorites.Any(favorite => string.Equals(favorite.Id, item.FavoriteKey, StringComparison.OrdinalIgnoreCase));
+        item.Status = "已手工补齐目录";
+
+        UpdateSummary();
+        RefreshFavoriteViews();
+        FilterChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static string OfficeFileDialogFilter(ActivityItem item)
+    {
+        if (item.ProcessName.Equals("EXCEL", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Excel 文件 (*.xlsx;*.xls;*.xlsm)|*.xlsx;*.xls;*.xlsm|所有文件 (*.*)|*.*";
+        }
+
+        if (item.ProcessName.Equals("WINWORD", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Word 文件 (*.docx;*.doc)|*.docx;*.doc|所有文件 (*.*)|*.*";
+        }
+
+        if (item.ProcessName.Equals("POWERPNT", StringComparison.OrdinalIgnoreCase))
+        {
+            return "PowerPoint 文件 (*.pptx;*.ppt)|*.pptx;*.ppt|所有文件 (*.*)|*.*";
+        }
+
+        return "Office 文件 (*.xlsx;*.xls;*.xlsm;*.docx;*.doc;*.pptx;*.ppt)|*.xlsx;*.xls;*.xlsm;*.docx;*.doc;*.pptx;*.ppt|所有文件 (*.*)|*.*";
+    }
+
+    private static string InitialOfficeDirectory()
+    {
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return Directory.Exists(documents)
+            ? documents
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    }
+
     private void OpenFavorite(FavoriteItem? item)
     {
         if (item is null)
@@ -640,6 +729,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
 
-        return string.IsNullOrWhiteSpace(version) ? "1.0.1" : version;
+        return string.IsNullOrWhiteSpace(version) ? "1.0.2" : version;
     }
 }
